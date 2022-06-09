@@ -1,5 +1,7 @@
 {
   "resources": [
+    {"id":{"name":"oTest","path":"objects/oTest/oTest.yy",},"order":3,},
+    {"id":{"name":"FastSM","path":"scripts/FastSM/FastSM.yy",},"order":2,},
     {"id":{"name":"Room1","path":"rooms/Room1/Room1.yy",},"order":1,},
   ],
   "Options": [

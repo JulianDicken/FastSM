@@ -9,12 +9,12 @@ function FastSM(_size, _transition_count) constructor {
     __owner = other; //calling instance
     
     __size = _size; //amount of total states
-    __states = array_create(__size, undefined)
+    __states = array_create(__size, undefined);
     __states[0] = { name: "INTERNAL_state_not_a_state" } //internal, used for technicalk reasons
     __state_active = 0; //index of currently active state
     
     __transition_count = _transition_count; //amount of total transitions
-    __transitions = array_create(__transition_count, undefined)
+    __transitions = array_create(__transition_count, undefined);
     
     __default_events = { }; //default event map
     __default_events[$ "enter"] = function() {  }

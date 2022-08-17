@@ -2,10 +2,10 @@
 #macro FASTSM_ENABLE_WARNINGS true
 #macro FASTSM_ENABLE_LOGGING true
 #macro FASTSM_ERROR_LOGGER throw
-#macro FASTSM_WARN_LOGGER show_message
+#macro FASTSM_WARN_LOGGER show_debug_message
 #macro FASTSM_LOG_LOGGER show_debug_message
 
-function FastSM(_size, _transition_count) constructor {  
+function FastSM(_size, _trigger_count) constructor {  
     __owner = other; //calling instance
     
     __size = _size; //amount of total states
@@ -13,8 +13,8 @@ function FastSM(_size, _transition_count) constructor {
     __states[0] = { name: "INTERNAL_state_not_a_state" } //internal, used for technicalk reasons
     __state_active = 0; //index of currently active state
     
-    __transition_count = _transition_count; //amount of total transitions
-    __transitions = array_create(__transition_count, undefined);
+    __trigger_count = _trigger_count; //amount of total triggers
+    __triggers		= array_create(__trigger_count, undefined);
     
     __default_events = { }; //default event map
     __default_events[$ "enter"] = function() {  }
@@ -37,7 +37,7 @@ function FastSM(_size, _transition_count) constructor {
 	/// @returns {None} none
     static __fastsm_warn = function() {
         if (FASTSM_ENABLE_WARNINGS) {
-    		var _out = "[WARNING] FastSM\n";
+    		var _out = "[WARNING] FastSM::";
     		var i = -1; repeat(argument_count) { i++;
     			_out += string(argument[i]);	
     		}
@@ -74,7 +74,7 @@ function FastSM(_size, _transition_count) constructor {
     static __state_build = function(_id) {
         var _state = __states[_id];
         var _mask = 0x00;
-
+		
         _state[$ "tags"] ??= noone;
         _state[$ "tags"] = is_array(_state[$ "tags"]) ? _state[$ "tags"] : [_state[$ "tags"]];
         
@@ -150,23 +150,23 @@ function FastSM(_size, _transition_count) constructor {
     
     /// @param {Int} trigger id
 	/// @returns {None} none
-    static __transition_build = function(_id) {
-        var _transition = __transitions[_id];
+    static __trigger_build = function(_id) {
+        var _trigger = __triggers[_id];
         
         var _include = [];
         var _exclude = [];
         
-        _transition[$ "include"] ??= noone 
-        if (!is_array(_transition[$ "include"])) {
-            _transition[$ "include"] = [_transition[$ "include"]];
+        _trigger[$ "include"] ??= noone 
+        if (!is_array(_trigger[$ "include"])) {
+            _trigger[$ "include"] = [_trigger[$ "include"]];
         }
-        _include = _transition[$ "include"]; 
+        _include = _trigger[$ "include"]; 
         
-        _transition[$ "exclude"] ??= noone 
-        if (!is_array(_transition[$ "exclude"])) {
-            _transition[$ "exclude"] = [_transition[$ "exclude"]];
+        _trigger[$ "exclude"] ??= noone 
+        if (!is_array(_trigger[$ "exclude"])) {
+            _trigger[$ "exclude"] = [_trigger[$ "exclude"]];
         }
-        _exclude = _transition[$ "exclude"]; 
+        _exclude = _trigger[$ "exclude"]; 
         
         var _include_mask = 0x00;
         if (_include[0] == noone) {
@@ -192,23 +192,23 @@ function FastSM(_size, _transition_count) constructor {
             }
         }
         
-        var _mask = (~_exclude_mask) & _include_mask;
-        _transition[$ "__mask"] = _mask;
+		_trigger[$ "__include_mask"] = _include_mask;
+        _trigger[$ "__exclude_mask"] = _exclude_mask;
         
         var _allow = [];
         var _forbid = [];
         
-        _transition[$ "allow"] ??= noone 
-        if (!is_array(_transition[$ "allow"])) {
-            _transition[$ "allow"] = [_transition[$ "allow"]];
+        _trigger[$ "allow"] ??= noone 
+        if (!is_array(_trigger[$ "allow"])) {
+            _trigger[$ "allow"] = [_trigger[$ "allow"]];
         }
-        _allow = _transition[$ "allow"]; 
+        _allow = _trigger[$ "allow"]; 
         
-        _transition[$ "forbid"] ??= noone 
-        if (!is_array(_transition[$ "forbid"])) {
-            _transition[$ "forbid"] = [_transition[$ "forbid"]];
+        _trigger[$ "forbid"] ??= noone 
+        if (!is_array(_trigger[$ "forbid"])) {
+            _trigger[$ "forbid"] = [_trigger[$ "forbid"]];
         }
-        _forbid = _transition[$ "forbid"]; 
+        _forbid = _trigger[$ "forbid"]; 
         
         var _allow_mask = 0x00;
         if (_allow[0] == noone) {
@@ -234,83 +234,90 @@ function FastSM(_size, _transition_count) constructor {
             }
         }
 
-        _transition[$ "__allow_mask"]   = _allow_mask;
-        _transition[$ "__forbid_mask"]  = _forbid_mask;
-        _transition[$ "transition"] = method( __owner, _transition[$ "transition"]);
+        _trigger[$ "__allow_mask"]   = _allow_mask;
+        _trigger[$ "__forbid_mask"]  = _forbid_mask;
+        _trigger[$ "trigger"] = method( __owner, _trigger[$ "trigger"]);
     }
     
     /// @param {Int} trigger id
 	/// @returns {None} none
-    static transition_build = function(_id) {
+    static trigger_build = function(_id) {
         if (FASTSM_ENABLE_SAFETY) {
-            if (__transitions[_id] == undefined) {
+            if (__triggers[_id] == undefined) {
                 __fastsm_warn(
-                    "Transition with id\"",
+                    "Trigger with id\"",
                      string(_id), 
                     "\" has not been defined yet and cannot be built. Skipping."
                 )
                 return;
             }
             __fastsm_log(
-                "BUILDING: Transition \"",
-                __transitions[_id][$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a transition name>",
+                "BUILDING: Trigger \"",
+                __triggers[_id][$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a trigger name>",
                 "\""
             )
         }
         
-        __transition_build( _id );
+        __trigger_build( _id );
     }
     
     /// @param {Int} trigger id
-    /// @param {Struct} transition struct
+    /// @param {Struct} trigger struct
 	/// @returns {None} none
-    static __transition_add = function(_id, _transition) {
-        __transitions[_id] = _transition;
+    static __trigger_add = function(_id, _trigger) {
+        __triggers[_id] = _trigger;
     }
     /// @param {Int} trigger id
-    /// @param {Struct} transition struct
+    /// @param {Struct} trigger struct
 	/// @returns {None} none
-    static transition_add = function(_id, _transition) {
+    static trigger_add = function(_id, _trigger) {
         if (FASTSM_ENABLE_SAFETY) {
-            if (!is_struct(_transition)) {
+            if (!is_struct(_trigger)) {
                 __fastsm_error(
-                    "Expected transition struct, got \"",
-                    typeof(_transition),
+                    "Expected trigger struct, got \"",
+                    typeof(_trigger),
                     "\" instead."
                 )
             }
-            if (__transitions[_id] != undefined) {
+            if (__triggers[_id] != undefined) {
                 __fastsm_warn(
-                    "Transition \"",
-                    _transition[$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a transition name>", 
+                    "Trigger \"",
+                    _trigger[$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a trigger name>", 
                     "\" has been defined already. The previous definition has been replaced."
                 )
             }
-            if (_transition[$ "transition"] == undefined || !__valid_method(_transition[$ "transition"])) {
+            if (_trigger[$ "trigger"] == undefined || !__valid_method(_trigger[$ "trigger"])) {
                 __fastsm_error(
-                    "Expected transition function, got \"",
-                    typeof(_transition[$ "transition"]),
+                    "Expected trigger function, got \"",
+                    typeof(_trigger[$ "trigger"]),
                     "\" instead."
                 )
             }
         }
         
-        __transition_add(_id, _transition);
+        __trigger_add(_id, _trigger);
     }
     
     /// @param {Int} trigger id
 	/// @returns {None} none
     static __trigger_process = function(_id) {
-        var _transition = __transitions[_id];
+        var _trigger	= __triggers[_id];
         var _result     =  undefined;
         
-        if ((1<<__state_active) & _transition[$ "__forbid_mask"]) {
-            return;
-        }
-        if ((1<<__state_active) & _transition[$ "__allow_mask"] ||
-                _transition[$ "__mask"] & __states[__state_active][$ "__mask"]) {
-            _result = _transition[$ "transition"]( __state_active, __states[__state_active] );
-        }
+		if (__state_active == 0) {
+			return;	
+		}
+		if ((1<<__state_active) & _trigger[$ "__allow_mask"]) {
+			_result = _trigger[$ "trigger"]( __states[__state_active] );
+		} else {
+	        if ((1<<__state_active) & _trigger[$ "__forbid_mask"] || 
+				_trigger[$ "__exclude_mask"] & __states[__state_active][$ "__mask"]) {
+	            return;
+	        }
+	        if (_trigger[$ "__include_mask"] & __states[__state_active][$ "__mask"]) {
+	            _result = _trigger[$ "trigger"]( __states[__state_active] );
+	        }
+		}
         if (!_result) {
             return;
         }
@@ -320,28 +327,30 @@ function FastSM(_size, _transition_count) constructor {
 	/// @returns {None} none
     static trigger_process = function(_id) {
         if (FASTSM_ENABLE_SAFETY) {
-            if (__transitions[_id] == undefined) {
+            if (__triggers[_id] == undefined) {
                 __fastsm_error(
-                    "Transition with id\"",
+                    "Trigger with id\"",
                      string(_id), 
                     "\" has not been defined yet and cannot be triggered."
                 )
             }
-            if (__transitions[_id][$ "__mask"] == undefined ||
-                __transitions[_id][$ "__allow_mask"] == undefined ||
-                __transitions[_id][$ "__forbid_mask"] == undefined) {
+            if (__triggers[_id][$ "__include_mask"] == undefined ||
+				__triggers[_id][$ "__exclude_mask"] == undefined ||
+                __triggers[_id][$ "__allow_mask"]	== undefined ||
+                __triggers[_id][$ "__forbid_mask"]	== undefined) {
                 __fastsm_error(
-                    "Transition \"",
-                    __transitions[_id][$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a transition name>", 
+                    "Trigger \"",
+                    __triggers[_id][$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a trigger name>", 
                     "\" has not been built yet and cannot be triggered."
                 )
             }
-            if ((__transitions[_id][$ "__mask"] == 0x00 && 
-                 __transitions[_id][$ "__allow_mask"] == 0x00) ||
-                 __transitions[_id][$ "__forbid_mask"] == 0x7FFFFFFFFFFFFFFF) {
+            if ((__triggers[_id][$ "__include_mask"]	== 0x00 && 
+                 __triggers[_id][$ "__allow_mask"]		== 0x00) ||
+                 __triggers[_id][$ "__forbid_mask"]		== 0x7FFFFFFFFFFFFFFF || 
+				 __triggers[_id][$ "__exclude_mask"]	== 0x7FFFFFFFFFFFFFFF) {
                 __fastsm_warn(
-                    "Transition \"",
-                    __transitions[_id][$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a transition name>", 
+                    "Trigger \"",
+                    __triggers[_id][$ "name"] ?? "id: " + string(_id) + " <unknown name, please provide a trigger name>", 
                     "\" is invalid and will never be triggered."
                 )
             }
@@ -500,11 +509,11 @@ function FastSM(_size, _transition_count) constructor {
         __default_events_keys = variable_struct_get_names(__default_events);
         
         //we skip state 0 since it only exists for technical reasons
-        var i = 0; var n = __size - 1; repeat(n) { i++;
+        var i = 0; var n = __size - 1; repeat( n ) { i++;
             state_build(i);
         }
-        var i = -1; var n = __transition_count; repeat(n) { i++;
-            transition_build(i);
+        var i = -1; var n = __trigger_count; repeat( n ) { i++;
+            trigger_build(i);
         }
         return self;
     }

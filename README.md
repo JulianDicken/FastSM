@@ -52,11 +52,11 @@ fsm.add( State.Foo, {
     }
 });
 
-fsm.transition_add( Trigger.A, {
+fsm.trigger_add( Trigger.A, {
     name : "Trigger A",
     include: all,
     forbid: State.Bar,
-    transition : function(_source) {
+    trigger : function(_source) {
         switch _source {
             case State.Foo:
                 return State.Bar;

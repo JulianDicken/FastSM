@@ -1,80 +1,89 @@
-#macro FASTSM_ENABLE_SAFETY true
-#macro FASTSM_ENABLE_WARNINGS true
-#macro FASTSM_ENABLE_LOGGING true
-#macro FASTSM_ERROR_LOGGER throw
-#macro FASTSM_WARN_LOGGER show_debug_message
-#macro FASTSM_LOG_LOGGER show_debug_message
+//# feather use syntax-errors
+#macro FASTSM_ENABLE_VERSION    "v0.0.3"
+#macro FASTSM_ENABLE_SAFETY     true
+#macro FASTSM_ENABLE_WARNINGS   true
+#macro FASTSM_ENABLE_LOGGING    true
+#macro FASTSM_ERROR_LOGGER      throw
+#macro FASTSM_WARN_LOGGER       show_debug_message
+#macro FASTSM_LOG_LOGGER        show_debug_message
 
 function FastSM(_size, _trigger_count) constructor {  
-    __owner = other; //calling instance
-    
-    __size = _size; //amount of total states
-    __states = array_create(__size, undefined);
-    __states[0] = { name: "INTERNAL_state_not_a_state" } //internal, used for technicalk reasons
-    __state_active = 0; //index of currently active state
-    
-    __trigger_count = _trigger_count; //amount of total triggers
-    __triggers		= array_create(__trigger_count, undefined);
-    
-    __default_events = { }; //default event map
-    __default_events[$ "enter"] = function() {  }
-    __default_events[$ "leave"] = function() {  }
+    //calling instance
+    __owner = other;
+    //amount of total states
+    __size =            _size;
+    __states =          array_create(__size, undefined);
+    //internal, used for technicalk reasons
+    __states[0] =       { name: "INTERNAL_state_not_a_state" }
+    //index of currently active state
+    __state_active =    0;
+    __state_previous =  0;
+    //amount of total triggers
+    __trigger_count =   _trigger_count;
+    __triggers =        array_create(__trigger_count, undefined);
+    //default event map
+    __default_events = 
+    {
+        enter: function() {},
+        leave: function() {}
+    };
     __default_events_keys = variable_struct_get_names(__default_events);
+    //time the current state has been active for in microseconds
+    __time = get_timer();
     
-    __time = get_timer(); //time the current state has been active for in microseconds
-    
+    /// @ignore
     /// @param {string} error message
-	/// @returns {None} none
     static __fastsm_error = function() {
         var _out = "[ERROR] FastSM\n";
         var i = -1; repeat(argument_count) { i++;
-        	_out += string(argument[i]);	
+            _out += string(argument[i]);
         }
         FASTSM_ERROR_LOGGER(_out);
-	};
+    };
     
+    /// @ignore
     /// @param {string} error message
-	/// @returns {None} none
     static __fastsm_warn = function() {
         if (FASTSM_ENABLE_WARNINGS) {
-    		var _out = "[WARNING] FastSM::";
-    		var i = -1; repeat(argument_count) { i++;
-    			_out += string(argument[i]);	
-    		}
-    		FASTSM_WARN_LOGGER(_out);
+            var _out = "[WARNING] FastSM::";
+            var i = -1; repeat(argument_count) { i++;
+                _out += string(argument[i]);
+            }
+            FASTSM_WARN_LOGGER(_out);
         }
-	};
+    };
     
+    /// @ignore
     /// @param {string} error message
-	/// @returns {None} none
     static __fastsm_log = function() {
         if (FASTSM_ENABLE_LOGGING) {
-		    var _out = "[LOG] FastSM::";
-    		var i = -1; repeat(argument_count) { i++;
-    			_out += string(argument[i]);	
-    		}
-    		FASTSM_LOG_LOGGER(_out);
+            var _out = "[LOG] FastSM::";
+            var i = -1; repeat(argument_count) { i++;
+                _out += string(argument[i]);
+            }
+            FASTSM_LOG_LOGGER(_out);
         }
-	};
+    };
     
     
     //stolen from (Sohom Sahaun | @sohomsahaun)'s SnowState
-    /// @param {method} method
-	/// @returns {Bool} whether the supplied method is a method (true) or not (false)
-    __valid_method = function(_method) {
-		try {
-			return is_method(method(undefined, _method));
-		} catch (_e) {
-			return false;	
-		}
-	};
+    /// @ignore
+    /// @param  {method}    method
+    /// @returns {Bool} whether the supplied method is a method (true) or not (false)
+    static __valid_method = function(_method) {
+        try {
+            return is_method(method(undefined, _method));
+        } catch (_e) {
+            return false;
+        }
+    };
     
-    /// @param {Int} state id
-	/// @returns {None} none
+    /// @ignore
+    /// @param  {real}  state  id
     static __state_build = function(_id) {
         var _state = __states[_id];
         var _mask = 0x00;
-		
+        
         _state[$ "tags"] ??= noone;
         _state[$ "tags"] = is_array(_state[$ "tags"]) ? _state[$ "tags"] : [_state[$ "tags"]];
         
@@ -92,14 +101,16 @@ function FastSM(_size, _trigger_count) constructor {
         _state[$ "__mask"] = _mask;
         
         var i = -1; var n = array_length(__default_events_keys); repeat(n) { i++;
-            var _event = __default_events_keys[i];
-            _state[$ _event] = method(__owner, (_state[$ _event] ?? __default_events[$ _event]))
+            var _event =    __default_events_keys[i];
+            var _funct =    _state[$ _event] ?? __default_events[$ _event];
+            
+            _state[$ _event] = method(__owner, _funct);
         }
         __states[_id] = _state;
     }
     
-    /// @param {Int} state id
-	/// @returns {None} none
+    /// @ignore
+    /// @param  {Real}  state   id
     static state_build = function(_id) {
         if (FASTSM_ENABLE_SAFETY) {
             if (__states[_id] == undefined) {
@@ -119,15 +130,9 @@ function FastSM(_size, _trigger_count) constructor {
         __state_build(_id);
     }
     
-    /// @param {Int} state id
-	/// @returns {None} none
-    static __state_add = function(_id, _state) {
-        __states[_id] = _state;
-    }
-    
-    /// @param {Int} state id
-    /// @param {Struct} state struct
-	/// @returns {None} none
+    /// @param {Real}   state   id
+    /// @param {Struct} state   struct {name: "", tags: [] or Tag, enter: function(this, previous), leave(this, next): function}
+    /// @returns {Struct.FastSM}
     static state_add = function(_id, _state) {
         if (FASTSM_ENABLE_SAFETY) {
             if (!is_struct(_state)) {
@@ -145,11 +150,12 @@ function FastSM(_size, _trigger_count) constructor {
                 )
             }
         }
-        __state_add(_id, _state);
+        
+        __states[_id] = _state;
     }
     
-    /// @param {Int} trigger id
-	/// @returns {None} none
+    /// @ignore
+    /// @param  {Real}  trigger id
     static __trigger_build = function(_id) {
         var _trigger = __triggers[_id];
         
@@ -239,8 +245,8 @@ function FastSM(_size, _trigger_count) constructor {
         _trigger[$ "trigger"] = method( __owner, _trigger[$ "trigger"]);
     }
     
-    /// @param {Int} trigger id
-	/// @returns {None} none
+    /// @ignore
+    /// @param  {Real} trigger id
     static trigger_build = function(_id) {
         if (FASTSM_ENABLE_SAFETY) {
             if (__triggers[_id] == undefined) {
@@ -261,15 +267,8 @@ function FastSM(_size, _trigger_count) constructor {
         __trigger_build( _id );
     }
     
-    /// @param {Int} trigger id
-    /// @param {Struct} trigger struct
-	/// @returns {None} none
-    static __trigger_add = function(_id, _trigger) {
-        __triggers[_id] = _trigger;
-    }
-    /// @param {Int} trigger id
-    /// @param {Struct} trigger struct
-	/// @returns {None} none
+    /// @param  {Real}      trigger id
+    /// @param  {Struct}    trigger struct {name, include, forbid, trigger: function(source) }
     static trigger_add = function(_id, _trigger) {
         if (FASTSM_ENABLE_SAFETY) {
             if (!is_struct(_trigger)) {
@@ -295,36 +294,37 @@ function FastSM(_size, _trigger_count) constructor {
             }
         }
         
-        __trigger_add(_id, _trigger);
+        __triggers[_id] = _trigger;
     }
     
+    /// @ignore
     /// @param {Int} trigger id
-	/// @returns {None} none
+    /// @returns {None} none
     static __trigger_process = function(_id) {
         var _trigger	= __triggers[_id];
         var _result     =  undefined;
         
-		if (__state_active == 0) {
-			return;	
-		}
-		if ((1<<__state_active) & _trigger[$ "__allow_mask"]) {
-			_result = _trigger[$ "trigger"]( __states[__state_active] );
-		} else {
-	        if ((1<<__state_active) & _trigger[$ "__forbid_mask"] || 
-				_trigger[$ "__exclude_mask"] & __states[__state_active][$ "__mask"]) {
-	            return;
-	        }
-	        if (_trigger[$ "__include_mask"] & __states[__state_active][$ "__mask"]) {
-	            _result = _trigger[$ "trigger"]( __states[__state_active] );
-	        }
-		}
+        if (__state_active == 0) {
+            return;
+        }
+        if ((1<<__state_active) & _trigger[$ "__allow_mask"]) {
+            _result = _trigger[$ "trigger"]( __states[__state_active] );
+        } else {
+            if ((1<<__state_active) & _trigger[$ "__forbid_mask"] || 
+                _trigger[$ "__exclude_mask"] & __states[__state_active][$ "__mask"]) {
+                return;
+            }
+            if (_trigger[$ "__include_mask"] & __states[__state_active][$ "__mask"]) {
+                _result = _trigger[$ "trigger"]( __states[__state_active] );
+            }
+        }
         if (!_result) {
             return;
         }
         fsm_change( _result );
     }
-    /// @param {Int} trigger id
-	/// @returns {None} none
+    
+    /// @param  {Real}  trigger id
     static trigger_process = function(_id) {
         if (FASTSM_ENABLE_SAFETY) {
             if (__triggers[_id] == undefined) {
@@ -359,15 +359,9 @@ function FastSM(_size, _trigger_count) constructor {
         __trigger_process(_id);
     }
     
-    /// @param {String} event name
-    /// @param {method} default event callback
-	/// @returns {None} none
-    static __event_add_default = function(_event, _func) {
-        __default_events[$ _event] = _func;
-    }
-    /// @param {String} event name
-    /// @param {method} default event callback
-	/// @returns {None} none
+    /// @param  {String}    event   name
+    /// @param  {Function}  default event callback
+    /// @returns {None} none
     static event_add_default = function(_event, _func = function() {}) {
         if (FASTSM_ENABLE_SAFETY) {
             if (!is_string(_event)) {
@@ -386,27 +380,35 @@ function FastSM(_size, _trigger_count) constructor {
             }
         }
         
-        __event_add_default(_event, _func);
+        __default_events[$ _event] = _func;
     }
     
-    
-    /// @param {Int} state id
-	/// @returns {None} none
+    /// @ignore
+    /// @param  {Real}  state id
     static __fsm_change = function(_id) {
-        __states[__state_active][$ "leave"](__states[__state_active]);
+        var _next_state =       __states[_id];
+        var _current_state =    __states[__state_active];
+        // Execute leave event.
+        _current_state[$ "leave"](_current_state, _next_state);
         
         __time = get_timer();
-        __state_active = _id;
-        __states[__state_active][$ "enter"](__states[__state_active]);
+        __state_previous =  __state_active;
+        __state_active =    _id;
         
+        var _previous_state =   _current_state;
+        var _current_state =    __states[__state_active];
+        // Execute enter event.
+        _current_state[$ "enter"](_current_state, _previous_state);
+        // Can change
+        var _current_state = __states[__state_active];
         
-        var i = -1; var n = array_length(__default_events_keys); repeat(n) { i++;
-            self[$ __default_events_keys[i]] = __states[__state_active][$ __default_events_keys[i]]
+        var i = 0; repeat(array_length(__default_events_keys) ) {
+            var _key =      __default_events_keys[i++];
+            self[$ _key] =  _current_state[$ _key];
         }
-        
     }
-    /// @param {Int} state id
-	/// @returns {None} none
+    
+    /// @param  {Real}  state id
     static fsm_change = function(_id) {
         if (FASTSM_ENABLE_SAFETY) {
             if (_id == 0) {
@@ -433,13 +435,18 @@ function FastSM(_size, _trigger_count) constructor {
         __fsm_change(_id);
     }
     
-	/// @returns {Struct} current state
+    /// @returns {Struct} current_state
     static fsm_get_active_state = function() {
         return __states[__state_active];
     }
     
-    /// @param {Int[]} tags to match
-	/// @returns {Int} match mask
+    /// @returns {Struct} previous_state
+    static fsm_get_previous_state = function() {
+        return __states[__state_previous];
+    }
+    
+    /// @param  {Array<Real>}   tags    tags to match
+    /// @returns {Real}
     static fsm_active_has_tag = function(_tags) {
         _tags ??= noone;
         _tags = is_array(_tags) ? _tags : [_tags];
@@ -459,26 +466,28 @@ function FastSM(_size, _trigger_count) constructor {
         return (_mask & __states[__state_active][$ "__mask"])
     }
     
-	/// @returns {real} current active state time in microseconds
+    /// @returns {Real} current active state time in microseconds
     static fsm_get_current_time = function() {
         return get_timer() - __time;
     }
     
-    
-    /// @param {Int} state id
-	/// @returns {None} none
+    /// @ignore
+    /// @param  {Real}  state id
     static __fsm_start = function(_id) {
-        __time = get_timer();
-        __state_active = _id;
-        __states[__state_active][$ "enter"](__states[__state_active]);
+        __time =            get_timer();
+        __state_active =    _id;
         
+        var _active = __states[__state_active];
+        _active[$ "enter"](_active);
+        _active = __states[__state_active];
         
         var i = -1; var n = array_length(__default_events_keys); repeat(n) { i++;
-            self[$ __default_events_keys[i]] = __states[__state_active][$ __default_events_keys[i]]
+            var _key =      __default_events_keys[i];
+            self[$ _key] =  __states[__state_active][$ _key];
         }
     }
-    /// @param {Int} state id
-	/// @returns {None} none
+    
+    /// @param  {Real}  state id
     static fsm_start = function(_id) {
         if (FASTSM_ENABLE_SAFETY) {
             if (_id == 0) {
@@ -503,18 +512,19 @@ function FastSM(_size, _trigger_count) constructor {
         __fsm_start(_id);
     }
     
-
-	/// @returns {FastSM} self
+    /// @returns {FastSM} self
     static fsm_build = function() {
         __default_events_keys = variable_struct_get_names(__default_events);
         
         //we skip state 0 since it only exists for technical reasons
-        var i = 0; var n = __size - 1; repeat( n ) { i++;
+        var i, n;
+        i = 0;  n = __size - 1; repeat( n ) { i++;
             state_build(i);
         }
-        var i = -1; var n = __trigger_count; repeat( n ) { i++;
+        i = -1; n = __trigger_count; repeat( n ) { i++;
             trigger_build(i);
         }
+        
         return self;
     }
     
@@ -528,4 +538,5 @@ function FastSM(_size, _trigger_count) constructor {
     static build    = fsm_build;
     static time     = fsm_get_current_time;
     static current  = fsm_get_active_state;
+    static previous = fsm_get_previous_state;
 }

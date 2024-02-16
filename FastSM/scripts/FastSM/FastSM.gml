@@ -308,14 +308,14 @@ function FastSM(_size, _trigger_count) constructor {
             return;
         }
         if ((1<<__state_active) & _trigger[$ "__allow_mask"]) {
-            _result = _trigger[$ "trigger"]( __states[__state_active] );
+            _result = _trigger[$ "trigger"](__state_active, __states[__state_active] );
         } else {
             if ((1<<__state_active) & _trigger[$ "__forbid_mask"] || 
                 _trigger[$ "__exclude_mask"] & __states[__state_active][$ "__mask"]) {
                 return;
             }
             if (_trigger[$ "__include_mask"] & __states[__state_active][$ "__mask"]) {
-                _result = _trigger[$ "trigger"]( __states[__state_active] );
+                _result = _trigger[$ "trigger"](__state_active, __states[__state_active] );
             }
         }
         if (!_result) {
